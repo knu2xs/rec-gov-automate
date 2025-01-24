@@ -99,3 +99,6 @@ env/
 
 # exclude the docs build directory
 docs/
+
+# azure files
+__azurite*
