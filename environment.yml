@@ -1,0 +1,29 @@
+name: rec_gov_automate
+
+channels:
+  - microsoft
+  - conda-forge
+
+dependencies:
+  - black>=21
+  - jupyterlab
+  - jupyterlab_code_formatter
+  - pandas
+  - pandoc
+  - pip
+  - pytest
+  - pytest-playwright
+  - pyyaml
+  - requests
+  - pip:
+    - autodocsumm
+    - build
+    - bump2version
+    - furo
+    - ipykernel
+    - sphinx
+    - sphinxcontrib-youtube
+    - sphinx-autodoc-typehints
+    - sphinx-copybutton
+    - twilio
+    - twine
