@@ -59,7 +59,7 @@ docsrc/build/
 target/
 
 # configuration files
-**/secrets.ini
+.env
 .env
 
 # Database

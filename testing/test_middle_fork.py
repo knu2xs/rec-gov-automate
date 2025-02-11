@@ -3,7 +3,7 @@ from pathlib import Path
 import pandas as pd
 
 from rec_gov_automate.utils import get_recgov_credentials
-from rec_gov_automate.availability import get_river_permit_availability_by_month
+from rec_gov_automate.availability import get_4rivers_permit_availability_by_month
 from rec_gov_automate.reserve import (
     reserve_middle_fork_permit_date,
     remove_reservations,
@@ -22,7 +22,7 @@ day = 12
 
 def test_get_middle_fork_availability():
     # get available dates
-    avail_df = get_river_permit_availability_by_month(permit_id, start_month=month)
+    avail_df = get_4rivers_permit_availability_by_month(permit_id, start_month=month)
 
     assert isinstance(avail_df, pd.DataFrame)
     assert len(avail_df.index) > 0
@@ -34,7 +34,7 @@ def test_reserve_middle_fork_permit_date(secrets_path):
     reserved = False
 
     # get available dates
-    avail_df = get_river_permit_availability_by_month(permit_id, start_month=month)
+    avail_df = get_4rivers_permit_availability_by_month(permit_id, start_month=month)
 
     # filer to just the availability on the day of the month and available permits
     avail_df = avail_df.loc[

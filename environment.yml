@@ -17,13 +17,14 @@ dependencies:
   - requests
   - pip:
     - autodocsumm
+    - azure-communication-sms
     - build
     - bump2version
     - furo
     - ipykernel
+    - python-dotenv
     - sphinx
     - sphinxcontrib-youtube
     - sphinx-autodoc-typehints
     - sphinx-copybutton
-    - twilio
     - twine

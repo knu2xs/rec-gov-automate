@@ -2,23 +2,18 @@ from datetime import datetime
 from typing import Optional
 
 import pandas as pd
+import pytz
 import requests
 
 __all__ = [
     "get_campground_availability_by_month",
     "filter_campsites_to_available_weekends",
-    "get_river_permit_availability_by_month",
+    "get_4rivers_permit_availability_by_month",
 ]
 
 
 # configure the headers
-_headers_dict = {
-    "Content-Type": "application/json",
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-    "AppleWebKit/537.36 (KHTML, like Gecko) "
-    "Chrome/132.0.0.0 Safari/537.36 "
-    "Edg/132.0.0.0",
-}
+_headers_dict = {"Content-Type": "application/json", "User-Agent": "Chrome/132.0.0.0"}
 
 
 def get_campground_availability_by_month(
@@ -125,9 +120,9 @@ def filter_campsites_to_available_weekends(campsite_df: pd.DataFrame) -> pd.Data
 
     .. note::
 
-    If searching for availability at the beginning of the availability window, *do not* use this function. At the
-    beginning of the availability window only Friday will be available. Saturday will not yet be reservable *unless*
-    you reserve for Friday and stay through Saturday.
+        If searching for availability at the beginning of the availability window, *do not* use this function. At the
+        beginning of the availability window only Friday will be available. Saturday will not yet be reservable *unless*
+        you reserve for Friday and stay through Saturday.
 
     Args:
         campsite_df: Campsite availability dataframe.
@@ -182,7 +177,7 @@ def filter_campsites_to_available_weekends(campsite_df: pd.DataFrame) -> pd.Data
     return weekend_df
 
 
-def get_river_permit_availability_by_month(
+def get_4rivers_permit_availability_by_month(
     permit_id: int,
     start_month: int,
     start_year: Optional[int] = None,
@@ -230,8 +225,14 @@ def get_river_permit_availability_by_month(
     # pull the dates out of the index so easier to work with later
     avail_df.reset_index(names=["date"], inplace=True)
 
-    # cast the date to datetime
+    # cast the date to datetime in mountain time since this is where the USFS offices are
     avail_df["date"] = pd.to_datetime(avail_df["date"])
+
+    # use only useful columns
+    avail_df = avail_df.loc[
+        :,
+        ["date", "total", "remaining"],
+    ]
 
     # filter to just available dates if desired
     if only_available:
