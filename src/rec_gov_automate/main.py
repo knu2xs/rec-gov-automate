@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from functools import cache
 from typing import Optional, Union
 
@@ -10,7 +10,7 @@ from dateutil.relativedelta import FR, relativedelta
 from .utils.availability import get_4rivers_permit_availability_by_month, _headers_dict
 from .utils.reserve import reserve_4rivers_permit_date
 
-__all__ = ["FourRivers"]
+__all__ = ["FourRivers", "get_fourrivers_availability"]
 
 # four rivers permit ids correlating to those on recreation.gov
 permit_ids = {
@@ -51,8 +51,8 @@ start_date = datetime(datetime.today().year, 5, 31) + relativedelta(weekday=FR(-
 
 permit_seasion_dict = {
     "main_salmon": [
-        # 28May - 03Sep
-        pd.to_datetime(f"{current_year}-05-28", utc=True),
+        # 20Jun - 03Sep
+        pd.to_datetime(f"{current_year}-06-20", utc=True),
         pd.to_datetime(f"{current_year}-09-03", utc=True),
     ],
     "middle_fork": [
@@ -323,6 +323,14 @@ class FourRivers:
             self.permit_id, month, year, False
         )
 
+    def _get_all_month_availability_with_river_key(
+        self, month: int, year: Optional[int] = None
+    ):
+        """Helper function to still allow the request to be cached, but append river key onto returned data."""
+        avail_df = self.get_all_month_availability(month, year)
+        avail_df.insert(loc=0, column="river", value=self.permit_key)
+        return avail_df
+
     def get_month_availability(
         self, month: int, year: Optional[int] = None
     ) -> pd.DataFrame:
@@ -409,36 +417,162 @@ class FourRivers:
         # check if the date is available
         avail = self.check_availability(day, month)
 
+        # flat to set if successful
+        status = False
+
         if not avail:
-            logging.info(
+            logging.debug(
                 datetime(year, month, day).strftime("%B %d, %Y")
                 + " not available for "
                 + self.permit_key
             )
 
-            status = False
-
         else:
-            reserve_4rivers_permit_date(
-                permit_id=self.permit_id,
-                day=day,
-                month=month,
-                launch_location_code=self.putin_code,
-                takeout_location_code=self.takeout_code,
-                pickup_permit_location_code=self.permit_pickup_location_code,
-                trip_days=self.trip_days,
-                year=year,
-                recgov_username=recgov_username,
-                recgov_password=recgov_password,
-                headless=headless,
-            )
+            # make a couple of attempts to make reservation
+            attempt_cnt = 0
+            while attempt_cnt < 3:
+                try:
+                    reserve_4rivers_permit_date(
+                        permit_id=self.permit_id,
+                        day=day,
+                        month=month,
+                        launch_location_code=self.putin_code,
+                        takeout_location_code=self.takeout_code,
+                        pickup_permit_location_code=self.permit_pickup_location_code,
+                        trip_days=self.trip_days,
+                        year=year,
+                        recgov_username=recgov_username,
+                        recgov_password=recgov_password,
+                        headless=headless,
+                    )
 
-            logging.info(
-                datetime(year, month, day).strftime("%B %d, %Y")
-                + "reserved for "
-                + self.permit_key
-            )
+                    status = True
 
-            status = True
+                    logging.info(
+                        datetime(year, month, day).strftime("%B %d, %Y")
+                        + "reserved for "
+                        + self.permit_key
+                    )
+
+                except Exception as e:
+                    attempt_cnt += 1
 
         return status
+
+
+def get_fourrivers_availability(
+    permit_season: bool = False,
+    only_available: bool = False,
+    year: Optional[int] = None,
+    search_df: Optional[pd.DataFrame] = None,
+) -> pd.DataFrame:
+    """
+    Helper to retrieve all dates for four rivers availability.
+
+    Args:
+        permit_season: Filter to just the permit controlled season dates. (default: ``False``)
+        only_available: Filter to just dates with available permits. (default: ``False``)
+        year: Filter to only include dates for specific year. (default: current year)
+        search_df: Search dataframe formatted to use for searching for available dates. (default: ``None``)
+    """
+    # if a search data frame is provided, only get dates and rivers being requested
+    if isinstance(search_df, pd.DataFrame):
+
+        # add current year to search dataframe if not already provided
+        if "year" not in search_df.columns:
+            search_df["year"] = date.today().year
+
+        # if year in dataframe, ensure values are populated
+        else:
+            search_df["year"].fillna(date.today().year, inplace=True)
+
+        # get unique river, year and month combinations
+        query_df = search_df[["river_key", "year", "month"]].drop_duplicates()
+
+        # variable for river instance
+        rvr: FourRivers = None
+
+        # iterate the rivers, years and months to only make the minimum requests to the website
+        for idx, river_key, year, month in query_df.itertuples():
+
+            # create river instance if a new river
+            if getattr(rvr, "river_key", "NaN") != river_key:
+                rvr = FourRivers._get_river(river_key)
+
+            # retrieve the data frame
+            tmp_df = rvr.get_all_month_availability(month, year)
+
+            # add the river key to the schema
+            tmp_df.insert(0, "river", river_key)
+
+            # if the first pass, assign to output
+            if idx == 0:
+                avail_df = tmp_df
+
+            # add for remaining months
+            else:
+                avail_df = pd.concat([avail_df, tmp_df], ignore_index=True)
+
+    # if only retrieving during the permit season
+    elif permit_season:
+        avail_df = pd.concat(
+            [
+                FourRivers(permit_id).get_permit_season_availability()
+                for permit_id in permit_ids.values()
+            ]
+        ).reset_index(drop=True)
+
+    else:
+        # if not provided, get the current year
+        year = date.today().year if year is None else year
+
+        # iterate the four rivers' permit ids and create a full availability data frame for each
+        for idx, permit_id in enumerate(permit_ids.values()):
+
+            # instantiate the object instance
+            rvr = FourRivers(permit_id)
+
+            # get the data for the river
+            tmp_df = pd.concat(
+                (rvr.get_all_month_availability(month, year) for month in range(1, 13))
+            )
+
+            # add the river key onto the data frame
+            tmp_df.insert(0, "river", rvr.permit_key)
+
+            # if the first pass, set the data frame to the final variable
+            if idx == 0:
+                avail_df = tmp_df.copy(deep=True)
+            else:
+                avail_df = pd.concat([avail_df, tmp_df], ignore_index=True)
+
+    # if a valid search dataframe is provided, use it
+    if isinstance(search_df, pd.DataFrame):
+
+        # add the date column to the search dataframe
+        search_df["date"] = pd.to_datetime(
+            search_df[["year", "month", "day"]], utc=True
+        )
+
+        # remove extra date columns
+        search_df.drop(columns=["year", "month", "day"], inplace=True)
+
+        # rename river key to make the table join easier
+        avail_df.rename(columns={"river": "river_key"}, inplace=True)
+
+        # remove unneeded columns
+        avail_df.drop(
+            columns=["show_walkup", "is_secret_quota"], inplace=True, errors="ignore"
+        )
+
+        # combine the data frames to get just available dates to try and reserve
+        avail_df = search_df.merge(avail_df, on=["river_key", "date"], how="left")
+
+    # if only retrieving available dates or searching for specific availability, filter to just these
+    if only_available or isinstance(search_df, pd.DataFrame):
+        avail_df = avail_df.loc[avail_df["remaining"] > 0]
+
+    # clean up the index
+    avail_df.reset_index(drop=True, inplace=True)
+
+    return avail_df

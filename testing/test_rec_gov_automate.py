@@ -1,13 +1,11 @@
-import logging
 from datetime import datetime, timedelta
 
+import pandas as pd
 import pytz
-from bokeh.core.property.datetime import TimeDelta
 
-from rec_gov_automate import FourRivers
+from rec_gov_automate import FourRivers, get_fourrivers_availability
 from rec_gov_automate.utils.reserve import remove_reservations
 from rec_gov_automate.utils.notification import (
-    send_notification,
     send_sms,
     send_gmail,
     send_pushover,
@@ -58,21 +56,6 @@ def test_reserve_river_permit_date_main_salmon_and_nofify():
     )
 
 
-def test_send_gmail():
-
-    recipient = "+14173436390@vtext.com"
-
-    month = 12  # December
-    day = 12
-    dt_str = datetime(datetime.today().year, month, day).strftime("%a %d %b")
-    message = f"Main Salmon {dt_str} https://bit.ly/3QbAiId"
-
-    # message = f"Test Recreation.gov Notification https://bit.ly/3QbAiId"
-    message = "Test Recreation.gov Notification https://recreation.gov/cart"
-
-    send_gmail(recipient, message)
-
-
 def test_send_sms():
 
     message = "Test Recreation.gov Notification https://recreation.gov/cart"
@@ -81,13 +64,14 @@ def test_send_sms():
     assert all([resp.successful for resp in resp_lst])
 
 
-def test_send_notification():
-
-    message = f"Test Recreation.gov Notification"
-    resp = send_notification(message)
-
-
 def test_send_pushover():
 
     message = "Test Recreation.gov Notification"
     resp = send_pushover(message)
+
+
+def test_search_using_dataframe(search_df: pd.DataFrame):
+
+    avail_df = get_fourrivers_availability(search_df=search_df)
+
+    assert len(avail_df.index) == 2

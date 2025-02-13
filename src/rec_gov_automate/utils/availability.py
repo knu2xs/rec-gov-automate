@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import Optional
 
@@ -210,32 +211,47 @@ def get_4rivers_permit_availability_by_month(
     # make the call to get the data
     res = requests.get(url_api, headers=_headers_dict)
 
-    # unpack the data to a dictionary
-    res_dict = res.json()
+    # handle problems when they arise
+    if res.status_code != 200:
+        logging.error(
+            f"Encountered an error retrieving {url_api}\n{res.json().get('error')}"
+        )
+        avail_df = pd.DataFrame(
+            columns=["total", "remaining", "show_walkup", "is_secret_quota"]
+        )
 
-    # pull out the availability from the response
-    avail_dict = res_dict.get("payload").get("availability")
+    else:
 
-    # unpack the date availability
-    dates_dict = avail_dict.get(next(iter(avail_dict))).get("date_availability")
+        # unpack the data to a dictionary
+        res_dict = res.json()
 
-    # create a data frame from the availability
-    avail_df = pd.DataFrame(dates_dict).transpose()
+        # pull out the availability from the response
+        avail_dict = res_dict.get("payload").get("availability")
 
-    # pull the dates out of the index so easier to work with later
-    avail_df.reset_index(names=["date"], inplace=True)
+        # unpack the date availability
+        dates_dict = avail_dict.get(next(iter(avail_dict))).get("date_availability")
 
-    # cast the date to datetime in mountain time since this is where the USFS offices are
-    avail_df["date"] = pd.to_datetime(avail_df["date"])
+        # create a data frame from the availability
+        avail_df = pd.DataFrame(dates_dict).transpose()
 
-    # use only useful columns
-    avail_df = avail_df.loc[
-        :,
-        ["date", "total", "remaining"],
-    ]
+        # if nothing is available create empty dataframe for returning
+        if len(avail_df.index) == 0:
+            avail_df = pd.DataFrame(
+                columns=["total", "remaining", "show_walkup", "is_secret_quota"]
+            )
 
-    # filter to just available dates if desired
-    if only_available:
-        avail_df = avail_df.loc[avail_df["remaining"] > 0]
+        else:
+            # pull the dates out of the index so easier to work with later
+            avail_df.reset_index(names=["date"], inplace=True)
+
+            # cast the date to datetime in mountain time since this is where the USFS offices are
+            avail_df["date"] = pd.to_datetime(avail_df["date"])
+
+            # use only useful columns
+            avail_df = avail_df.loc[:, ["date", "total", "remaining"]]
+
+            # filter to just available dates if desired
+            if only_available:
+                avail_df = avail_df.loc[avail_df["remaining"] > 0]
 
     return avail_df

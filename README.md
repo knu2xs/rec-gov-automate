@@ -7,8 +7,6 @@ Automate tasks when interacting with Recreation.gov
 1 - Clone this repo.
 
 2 - Create an environment with the requirements.
-
-**TODO:** Add browser installation to `make env`
     
 ```
 make env
