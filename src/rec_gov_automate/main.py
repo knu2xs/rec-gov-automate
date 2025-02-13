@@ -323,14 +323,6 @@ class FourRivers:
             self.permit_id, month, year, False
         )
 
-    def _get_all_month_availability_with_river_key(
-        self, month: int, year: Optional[int] = None
-    ):
-        """Helper function to still allow the request to be cached, but append river key onto returned data."""
-        avail_df = self.get_all_month_availability(month, year)
-        avail_df.insert(loc=0, column="river", value=self.permit_key)
-        return avail_df
-
     def get_month_availability(
         self, month: int, year: Optional[int] = None
     ) -> pd.DataFrame:
@@ -344,7 +336,7 @@ class FourRivers:
 
         """
         # get available dates
-        avail_df = self.get_all_month_availability(month)
+        avail_df = self.get_all_month_availability(month, year)
 
         # filter to just those available
         avail_df = avail_df.loc[avail_df["remaining"] > 0]
