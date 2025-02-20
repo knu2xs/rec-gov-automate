@@ -7,7 +7,7 @@ from rec_gov_automate import FourRivers, get_fourrivers_availability
 from rec_gov_automate.utils.notification import send_pushover
 
 # path to find search csv with rivers and dates to search for
-search_csv = Path(__file__).parent / ("four_rivers_search.csv")
+search_csv = Path(__file__).parent / "four_rivers_search.csv"
 
 
 if __name__ == "__main__":

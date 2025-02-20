@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 import re
 import smtplib
 from email.mime.text import MIMEText
@@ -182,15 +180,34 @@ def validate_phone_number(phone_number: str) -> str:
 def send_pushover(
     message: str, user_key: Optional[str] = None, api_token: Optional[str] = None
 ) -> requests.Response:
-    """Send notifications using Pushover application."""
-    if api_token is None or user_key is None:
+    """
+    Send notifications using Pushover platform.
+
+    Args:
+        message: Text message to send.
+        user_key: Pushover user key. If not provided, will try to retrieve from ``PUSHOVER_USER_KEY`` environment
+          variable.
+        api_token: Pushover API token. If not provided, will try to retrieve from ``PUSHOVER_API_TOKEN`` environment
+          variable.
+    """
+    if user_key is not None and api_token is None:
+        _, api_key = get_pushover_credentials()
+        logging.debug(
+            f"Using provided Pushover api_token with user_key from environment variables."
+        )
+    elif api_token is None and user_key is None:
         user_key, api_token = get_pushover_credentials()
         logging.debug("Using Pushover credentials from environment variables.")
     else:
         logging.debug("Using Pushover credentials from input parameters.")
 
     url = "https://api.pushover.net/1/messages.json"
-    payload = {"token": api_token, "user": user_key, "message": message}
+    payload = {
+        "token": api_token,
+        "user": user_key,
+        "message": message,
+        "sound": "bugle",
+    }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     res = requests.post(url, headers=headers, data=payload)

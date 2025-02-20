@@ -6,7 +6,6 @@ __all__ = [
     "get_recgov_credentials",
     "get_azure_sms_connection_string",
     "get_gmail_credentials",
-    "get_notification_credentials",
     "get_pushover_credentials",
 ]
 
@@ -96,7 +95,7 @@ def get_pushover_credentials():
     load_dotenv()
 
     user_key: str = os.environ.get("PUSHOVER_USER_KEY")
-    app_key: str = os.environ.get("PUSHOVER_APP_TOKEN")
+    app_key: str = os.environ.get("PUSHOVER_API_KEY")
 
     if user_key is None or app_key is None:
         raise EnvironmentError(
