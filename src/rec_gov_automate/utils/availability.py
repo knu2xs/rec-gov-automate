@@ -237,18 +237,24 @@ def get_4rivers_permit_availability_by_month(
         # if nothing is available create empty dataframe for returning
         if len(avail_df.index) == 0:
             avail_df = pd.DataFrame(
-                columns=["total", "remaining", "show_walkup", "is_secret_quota"]
+                columns=[
+                    "launch_date",
+                    "total",
+                    "remaining",
+                    "show_walkup",
+                    "is_secret_quota",
+                ]
             )
 
         else:
             # pull the dates out of the index so easier to work with later
-            avail_df.reset_index(names=["date"], inplace=True)
+            avail_df.reset_index(names=["launch_date"], inplace=True)
 
             # cast the date to datetime in mountain time since this is where the USFS offices are
-            avail_df["date"] = pd.to_datetime(avail_df["date"])
+            avail_df["launch_date"] = pd.to_datetime(avail_df["launch_date"])
 
             # use only useful columns
-            avail_df = avail_df.loc[:, ["date", "total", "remaining"]]
+            avail_df = avail_df.loc[:, ["launch_date", "total", "remaining"]]
 
             # filter to just available dates if desired
             if only_available:

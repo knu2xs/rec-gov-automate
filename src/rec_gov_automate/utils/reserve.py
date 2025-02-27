@@ -1,10 +1,9 @@
+import os
 from datetime import datetime, timedelta
 import re
 from typing import Optional, Union
 
 from playwright.sync_api import sync_playwright
-
-from .credentials import get_recgov_credentials
 
 __all__ = [
     "reserve_4rivers_permit_date",
@@ -54,7 +53,16 @@ def reserve_4rivers_permit_date(
             "If providing recreation.gov credentials, recgov_password and recgov_username must be set."
         )
     elif recgov_password is None and recgov_username is None:
-        recgov_username, recgov_password = get_recgov_credentials()
+        # load the variables
+        recgov_username = os.environ.get("RECGOV_USERNAME")
+        recgov_password = os.environ.get("RECGOV_PASSWORD")
+
+    if recgov_username is None or recgov_password is None:
+        raise EnvironmentError(
+            "Cannot load Recreation.gov credentials from environment variables, RECGOV_USERNAME and RECGOV_PASSWORD, "
+            "and recgov_password and recgov_username are not provided in the input arguments. Hence, cannot log into "
+            "Recreation.gov."
+        )
 
     # default to current year
     if year is None:
@@ -162,7 +170,7 @@ def reserve_4rivers_permit_date(
 
             page.get_by_label("Add watercraft").click()
 
-            # pick up permit at boundary creek (issuing station)
+            # pick up permit at issuing station
             if not headless:
                 page.get_by_label(
                     "Station Location* (Required)"
@@ -183,12 +191,13 @@ def reserve_4rivers_permit_date(
             # scroll all terms
             page.mouse.wheel(delta_x=0, delta_y=700)
 
-            # click acceptance of terms
+            # click scroll the terms
             if not headless:
                 page.locator("label").filter(
                     has_text="Yes, I have read and agree to"
                 ).locator("span").first.scroll_into_view_if_needed()
 
+            # click acceptance of terms
             page.locator("label").filter(
                 has_text="Yes, I have read and agree to"
             ).locator("span").first.check()

@@ -73,5 +73,4 @@ def test_send_pushover():
 def test_search_using_dataframe(search_df: pd.DataFrame):
 
     avail_df = get_fourrivers_availability(search_df=search_df)
-
     assert len(avail_df.index) == 2

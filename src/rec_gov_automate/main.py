@@ -378,13 +378,14 @@ class FourRivers:
 
         # filter the dataframe to just the permit controlled season
         permit_df = permit_df.loc[
-            (permit_df["date"] >= start_date) & (permit_df["date"] <= end_date)
+            (permit_df["launch_date"] >= start_date)
+            & (permit_df["launch_date"] <= end_date)
         ].reset_index(drop=True)
 
         # add retrieval timestamp and days to launch metrics
-        permit_df["retrive_timestamp"] = datetime.now(tz=timezone.utc)
+        permit_df["retrieve_timestamp"] = datetime.now(tz=timezone.utc)
         permit_df["days_to_launch"] = (
-            permit_df.date - permit_df.retrive_timestamp
+            permit_df.launch_date - permit_df.retrieve_timestamp
         ).dt.days
 
         # add the name of the river as well
