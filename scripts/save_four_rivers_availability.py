@@ -33,6 +33,7 @@ if __name__ == "__main__":
 
     # use the date to create the path for saving all searched availability
     data_dir = Path(__file__).parent.parent / "data"
+    csv_name = dt_now.strftime("fourrivers_avail_%Y%m%dT%H%M%S.csv")
     csv_suffix = f"fourrivers/availability/year={dt_now.year}/month={dt_now.month:02d}/day={dt_now.day:02d}/{dt_now.isoformat()}.csv"
     csv_pth = data_dir / csv_suffix
 
