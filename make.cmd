@@ -48,18 +48,17 @@ GOTO %1
 
 :: Build the local environment from the environment file
 :env
-    :: Create new environment from environment file
-    CALL conda create -p %CONDA_DIR% --clone "C:\Program Files\ArcGIS\Pro\bin\Python\envs\arcgispro-py3"
-    GOTO add_dependencies
-
-:: Add python dependencies from environment.yml to the project environment
-:add_dependencies
-        
-    :: Add more fun stuff from environment file
+    :: Create new environment
+    CALL conda create -p %CONDA_DIR% 
+    
+    :: Add development dependencies from environment file
     CALL conda env update -p %CONDA_DIR% -f environment.yml
 
     :: Install the local package in development (experimental) mode
     CALL conda run -p %CONDA_DIR% python -m pip install -e .
+
+    :: Install playwright browsers
+    conda run -p %CONDA_DIR% playwright install
 
     GOTO end
 
