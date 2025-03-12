@@ -58,7 +58,7 @@ GOTO %1
     CALL conda run -p %CONDA_DIR% python -m pip install -e .
 
     :: Install playwright browsers
-    conda run -p %CONDA_DIR% playwright install
+    CALL conda run -p %CONDA_DIR% playwright install
 
     GOTO end
 
