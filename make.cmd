@@ -48,8 +48,11 @@ GOTO %1
 
 :: Build the local environment from the environment file
 :env
-    :: Create new environment from environment file
-    CALL conda create -p %CONDA_DIR% -f environment.yml
+    :: Create new environment
+    CALL conda create -p %CONDA_DIR% 
+    
+    :: Add development dependencies from environment file
+    CALL conda env update -p %CONDA_DIR% -f environment.yml
 
     :: Install the local package in development (experimental) mode
     CALL conda run -p %CONDA_DIR% python -m pip install -e .
