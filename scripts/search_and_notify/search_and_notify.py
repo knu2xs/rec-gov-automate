@@ -22,7 +22,7 @@ if __name__ == "__main__":
     search_df = pd.read_csv(search_csv)
 
     # find what is available and trim the schema
-    avail_df = get_fourrivers_availability(permit_season=True).loc[
+    avail_df = get_fourrivers_availability(permit_season=True, search_df=search_df).loc[
         :, ["river", "launch_date", "remaining"]
     ]
 

@@ -351,7 +351,7 @@ class FourRivers:
 
         # filter the data frame to the specific date
         avail_df = avail_df.loc[
-            (avail_df["date"].dt.day == day) & (avail_df["remaining"] > 0)
+            (avail_df["launch_date"].dt.day == day) & (avail_df["remaining"] > 0)
         ]
 
         # if the data frame has a record left, the date is available

@@ -74,3 +74,18 @@ def test_search_using_dataframe(search_df: pd.DataFrame):
 
     avail_df = get_fourrivers_availability(search_df=search_df)
     assert len(avail_df.index) == 2
+
+
+def test_try_reserve_cancellation_not_yet_released():
+
+    from rec_gov_automate.utils.reserve import reserve_4rivers_permit_date
+
+    river = 'selway'
+    month = 7
+    day = 14
+
+    rvr = FourRivers._get_river(river)
+
+    status = reserve_4rivers_permit_date(rvr.permit_id, day, month)
+
+    assert status

@@ -23,6 +23,9 @@ if __name__ == "__main__":
     # filter to just those with availablity and clean up the schema
     avail_df = avail_df.loc[avail_df['remaining'] > 0, ["river", "launch_date", "remaining"]]
 
+    # organize by date so list is more legible
+    avail_df.sort_values(['launch_date', 'river'], inplace=True)
+
     # if anything is available
     if len(avail_df.index) > 0:
 
