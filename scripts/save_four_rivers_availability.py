@@ -53,16 +53,20 @@ if __name__ == "__main__":
         ["river", "launch_date", "total", "remaining", "days_to_launch"],
     ]
 
+    # sort by date and river
+    # avail_df.sort_values(by=["launch_date", "river"], inplace=True)
+    avail_df.sort_values(by=["river", "launch_date"], inplace=True)
+
     # report available dates
     logging.info(f"Total available dates: {avail_df.shape[0]}")
 
-    # format date columns for legibilty
+    # format date columns for legibility
     avail_df["launch_date"] = pd.to_datetime(avail_df["launch_date"]).dt.date
 
     # log availability
     logging.info(format_pandas_for_logging(avail_df, "Four Rivers Availablity"))
 
-    # dump to StringIO object for saving to blob storage
+    # save to csv
     avail_df.to_csv(csv_pth, encoding="utf-8", index=False)
 
     # useful for tracking successful completion

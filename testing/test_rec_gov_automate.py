@@ -4,7 +4,7 @@ import pandas as pd
 import pytz
 
 from rec_gov_automate import FourRivers, get_fourrivers_availability
-from rec_gov_automate.utils.reserve import remove_reservations
+from rec_gov_automate.utils.reserve import clear_cart
 from rec_gov_automate.utils.notification import (
     send_sms,
     send_gmail,
@@ -14,8 +14,8 @@ from rec_gov_automate.utils.notification import (
 headless = True
 
 
-def test_remove_reservations(recgov_credentials):
-    remove_reservations(*recgov_credentials, headless=False)
+def test_clear_cart():
+    clear_cart(headless=False)
 
 
 def test_reserve_river_permit_date_middle_fork():
@@ -80,12 +80,72 @@ def test_try_reserve_cancellation_not_yet_released():
 
     from rec_gov_automate.utils.reserve import reserve_4rivers_permit_date
 
-    river = 'selway'
+    river = "selway"
     month = 7
     day = 14
+    headless = False
 
     rvr = FourRivers._get_river(river)
 
-    status = reserve_4rivers_permit_date(rvr.permit_id, day, month)
+    status = reserve_4rivers_permit_date(
+        permit_id=rvr.permit_id,
+        day=day,
+        month=month,
+        launch_location_code=rvr.putin_code,
+        takeout_location_code=rvr.takeout_code,
+        pickup_permit_location_code=rvr.permit_pickup_location_code,
+        trip_days=rvr.trip_days,
+        headless=headless,
+    )
 
-    assert status
+    assert status is False
+
+
+def test_try_reserve_outside_permit_season_available():
+
+    from rec_gov_automate.utils.reserve import reserve_4rivers_permit_date
+
+    river = "main_salmon"
+    month = 12
+    day = 25
+    headless = False
+
+    rvr = FourRivers._get_river(river)
+
+    status = reserve_4rivers_permit_date(
+        permit_id=rvr.permit_id,
+        day=day,
+        month=month,
+        launch_location_code=rvr.putin_code,
+        takeout_location_code=rvr.takeout_code,
+        pickup_permit_location_code=rvr.permit_pickup_location_code,
+        trip_days=rvr.trip_days,
+        headless=headless,
+    )
+
+    assert status is True
+
+
+def test_try_reserve_outside_permit_season_unavailable():
+
+    from rec_gov_automate.utils.reserve import reserve_4rivers_permit_date
+
+    river = "main_salmon"
+    month = 9
+    day = 3
+    headless = False
+
+    rvr = FourRivers._get_river(river)
+
+    status = reserve_4rivers_permit_date(
+        permit_id=rvr.permit_id,
+        day=day,
+        month=month,
+        launch_location_code=rvr.putin_code,
+        takeout_location_code=rvr.takeout_code,
+        pickup_permit_location_code=rvr.permit_pickup_location_code,
+        trip_days=rvr.trip_days,
+        headless=headless,
+    )
+
+    assert status is True
