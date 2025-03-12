@@ -543,7 +543,7 @@ def get_fourrivers_availability(
     if isinstance(search_df, pd.DataFrame):
 
         # add the date column to the search dataframe
-        search_df["date"] = pd.to_datetime(
+        search_df["launch_date"] = pd.to_datetime(
             search_df[["year", "month", "day"]], utc=True
         )
 
@@ -559,7 +559,10 @@ def get_fourrivers_availability(
         )
 
         # combine the data frames to get just available dates to try and reserve
-        avail_df = search_df.merge(avail_df, on=["river_key", "date"], how="left")
+        avail_df = search_df.merge(avail_df, on=["river_key", "launch_date"], how="left")
+
+        # rename river key for consistency with other outputs
+        avail_df.rename(columns={'river_key': 'river'}, inplace=True)
 
     # if only retrieving available dates or searching for specific availability, filter to just these
     if only_available or isinstance(search_df, pd.DataFrame):

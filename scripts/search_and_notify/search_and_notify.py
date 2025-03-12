@@ -1,10 +1,10 @@
-from datetime import date, datetime
+from configparser import ConfigParser
 from pathlib import Path
 
 import pandas as pd
 
-from rec_gov_automate import FourRivers, get_fourrivers_availability
-from rec_gov_automate.utils.notification import send_pushover
+from rec_gov_automate import get_fourrivers_availability
+from rec_gov_automate.utils.notification import send_sms
 
 # path to find search csv with rivers and dates to search for
 search_csv = Path(__file__).parent / "four_rivers_search.csv"
@@ -22,8 +22,8 @@ if __name__ == "__main__":
     search_df = pd.read_csv(search_csv)
 
     # find what is available and trim the schema
-    avail_df = get_fourrivers_availability(search_df=search_df).loc[
-        :, ["river_key", "date", "remaining"]
+    avail_df = get_fourrivers_availability(permit_season=True).loc[
+        :, ["river", "launch_date", "remaining"]
     ]
 
     # if anything is available
@@ -48,4 +48,4 @@ if __name__ == "__main__":
             notify_str = notify_str + avail_str
 
         # send the notification
-        send_pushover(notify_str)
+        send_sms(notify_str)
