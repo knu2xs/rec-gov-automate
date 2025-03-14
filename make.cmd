@@ -52,13 +52,13 @@ GOTO %1
     CALL conda create -p %CONDA_DIR% 
     
     :: Add development dependencies from environment file
-    CALL conda env update -p %CONDA_DIR% -f environment.yml
+    CALL conda env update -p %CONDA_DIR% --file environment.yml
 
     :: Install the local package in development (experimental) mode
     CALL conda run -p %CONDA_DIR% python -m pip install -e .
 
     :: Install playwright browsers
-    conda run -p %CONDA_DIR% playwright install
+    CALL conda run -p %CONDA_DIR% playwright install
 
     GOTO end
 
