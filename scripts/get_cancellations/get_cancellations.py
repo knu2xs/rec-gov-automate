@@ -43,11 +43,14 @@ if len(search_df.index) > 0:
     # iterate the search groups
     for search_group in search_df['search_group'].unique():
 
-        # set a flag for reserved status in this serach group
-        secured_permit = False
+        # set a flag for reserved status in this search group
+        permit_secured = False
 
-        # if there are any permits availble, iteratively try to retrive them
-        for idx, avail_row in avail_df[avail_df['search_group'] == search_group].iterrows():
+        # filter data frame to just this search group...redundant, but makes debugging easier
+        avail_grp_df = avail_df[avail_df['search_group'] == search_group]
+
+        # if there are any permits available, iteratively try to retrieve them
+        for idx, avail_row in avail_grp_df.iterrows():
             
             # convert the series to a dict for failover property retrieval
             avail_dict = avail_row.to_dict()
@@ -62,42 +65,49 @@ if len(search_df.index) > 0:
             )
 
             # use the river instance to try and secure the permit
-            secured_permit = rvr.reserve_date(
+            permit_secured = rvr.reserve_date(
                 day=avail_row.launch_date.day,
                 month=avail_row.launch_date.month,
                 year=avail_row.launch_date.year,
                 recgov_username=avail_dict.get('recgov_user'),
                 recgov_password=avail_row.get('recgov_pass'),
+                headless=False
             )
 
             # if a permit is successfully secured
-            if secured_permit:
+            if permit_secured:
 
                 # set the status for this search group in the dataframe
-                status_df.loc['search_group' == avail_row.search_group] = True
+                status_df.loc[status_df['search_group'] == search_group, 'secured_permit'] = True
 
                 # change the status changed flag
                 status_flg = True
 
                 # format the name of the river
-                river_name = avail_row.river_key.replace("_", " ").title()
+                river_name = avail_row.river.replace("_", " ").title()
 
                 # format the date
-                dt_str = avail_row.launch_dt.strftime("%a %d%b")
+                dt_str = avail_row.launch_date.strftime("%a %d%b")
 
                 tm_str = (
                     datetime.now(tz=pytz.timezone("US/Pacific")) + timedelta(minutes=14)
                 ).strftime("%H:%M")
 
                 # create the message string
-                msg_str = f'{river_name} permit for a {dt_str} launch is in your cart until {tm_str}\n\nhttps://recreation.gov/cart'
+                msg_str = f'{river_name} permit for a {dt_str} launch is in your cart until {tm_str}\nhttps://recreation.gov/cart'
 
-                # provide a notification
-                send_sms(msg_str)
+                # see if a notification number was provided
+                sns_number = avail_dict.get('sns_number')
+
+                # provide notification using default if no number provided
+                if sns_number is None:
+                    send_sms(msg_str)
+                else:
+                    send_sms(msg_str, sns_number)
 
                 # quit searching in this search group
                 break
 
-# Wite status out for next run if a permit was secured
+# write status out for next run if a permit was secured
 if status_flg:
-    status_df.to_csv(status_csv, encoding='utf-8')
+    status_df.to_csv(status_csv, encoding='utf-8', index=False)

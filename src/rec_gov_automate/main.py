@@ -1,14 +1,15 @@
 import logging
 from datetime import date, datetime, timezone
-from functools import cache
+from functools import cache, cached_property
+import  math
 from typing import Optional, Union
 
 import pandas as pd
 import requests
 from dateutil.relativedelta import FR, relativedelta
 
-from .utils.availability import get_4rivers_permit_availability_by_month, _headers_dict
-from .utils.reserve import reserve_4rivers_permit_date
+from .utils import availability
+from .utils import reserve
 
 __all__ = ["FourRivers", "get_fourrivers_availability"]
 
@@ -81,7 +82,7 @@ class FourRivers:
     def __init__(
         self,
         permit_id: int,
-        trip_days: Optional[int] = 7,
+        trip_days: Optional[int] = None,
         putin_code: Optional[Union[str, int]] = None,
         takeout_code: Optional[Union[str, int]] = None,
         permit_pickup_location_code: Optional[Union[str, int]] = None,
@@ -96,31 +97,47 @@ class FourRivers:
               derived from inspecting the reservation page.
         """
         self.permit_id = permit_id
-        self.trip_days = trip_days
 
         # reverse lookup to save river key
         self.permit_key = list(permit_ids.keys())[
             list(permit_ids.values()).index(permit_id)
         ]
 
-        # lookup default location codes if not provided
-        if putin_code is None:
-            self.putin_code = default_codes.get(self.permit_key)[0]
-        else:
-            self.putin_code = putin_code
+        # initially set to just input parameters...will lookup properties if necessary later...speeds up initialization
+        self._trip_days = trip_days
+        self._putin_code = putin_code
+        self._takeout_code = takeout_code
+        self._permit_pickup_location_code = permit_pickup_location_code
 
-        if takeout_code is None:
-            self.takeout_code = default_codes.get(self.permit_key)[1]
-        else:
-            self.takeout_code = takeout_code
+    @cached_property
+    def trip_days(self) -> int:
+        """Trip duration in days."""
+        if self._trip_days is None or math.isnan(self._trip_days):
+            self._trip_days = 7
+        return self._trip_days
 
-        if permit_pickup_location_code is None:
-            self.permit_pickup_location_code = default_codes.get(self.permit_key)[2]
-        else:
-            self.permit_pickup_location_code = permit_pickup_location_code
+    @cached_property
+    def putin_code(self) -> int:
+        """Code to use for selecting the putin location."""
+        if self._putin_code is None or math.isnan(self._putin_code):
+            self._putin_code = default_codes.get(self.permit_key)[0]
+        return self._putin_code
+
+    @cached_property
+    def takeout_code(self) -> int:
+        """Code to suse for selecting the takeout location."""
+        if self._takeout_code is None or math.isnan(self._takeout_code):
+            self._takeout_code = default_codes.get(self.permit_key)[1]
+        return self._takeout_code
+
+    @cached_property
+    def permit_pickup_location_code(self) -> int:
+        if self._permit_pickup_location_code is None or math.isnan(self._permit_pickup_location_code):
+            self._permit_pickup_location_code = default_codes.get(self.permit_key)[2]
+        return self._permit_pickup_location_code
 
     def __repr__(self):
-        return f"FourRivers ({self.permit_id})"
+        return f"FourRivers - {self.permit_key} ({self.permit_id})"
 
     @classmethod
     def _get_river(
@@ -266,7 +283,7 @@ class FourRivers:
         url = f"https://www.recreation.gov/api/permits/{self.permit_id}/details"
 
         # make the request
-        res = requests.get(url, headers=_headers_dict)
+        res = requests.get(url, headers=availability._headers_dict)
 
         # handle anything other than what we need
         if res.status_code != 200:
@@ -319,7 +336,7 @@ class FourRivers:
         """
         Get *all* availability for a given month, including unavailable dates.
         """
-        return get_4rivers_permit_availability_by_month(
+        return availability.get_4rivers_permit_availability_by_month(
             self.permit_id, month, year, False
         )
 
@@ -410,8 +427,8 @@ class FourRivers:
         # check if the date is available
         avail = self.check_availability(day, month)
 
-        # flat to set if successful
-        status = False
+        # variable to set if successful
+        success_flag = False
 
         if not avail:
             logging.debug(
@@ -423,9 +440,9 @@ class FourRivers:
         else:
             # make a couple of attempts to make reservation
             attempt_cnt = 0
-            while attempt_cnt < 3:
+            while attempt_cnt < 3 and not success_flag:
                 try:
-                    reserve_4rivers_permit_date(
+                    avail_status = reserve.reserve_4rivers_permit_date(
                         permit_id=self.permit_id,
                         day=day,
                         month=month,
@@ -439,18 +456,24 @@ class FourRivers:
                         headless=headless,
                     )
 
-                    status = True
+                    # if available, set status
+                    if avail_status:
+                        success_flag = True
 
-                    logging.info(
-                        datetime(year, month, day).strftime("%B %d, %Y")
-                        + "reserved for "
-                        + self.permit_key
-                    )
+                        logging.info(
+                            datetime(year, month, day).strftime("%B %d, %Y")
+                            + "reserved for "
+                            + self.permit_key
+                        )
+
+                    # if not available, break out of retry loop
+                    else:
+                        break
 
                 except Exception as e:
                     attempt_cnt += 1
 
-        return status
+        return success_flag
 
 
 def get_fourrivers_availability(

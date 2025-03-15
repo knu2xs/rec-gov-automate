@@ -28,6 +28,9 @@ from rec_gov_automate.utils import format_pandas_for_logging
 
 if __name__ == "__main__":
 
+    # set logging level
+    logging.basicConfig(level='INFO')
+
     # get the current date
     dt_now = datetime.now()
 

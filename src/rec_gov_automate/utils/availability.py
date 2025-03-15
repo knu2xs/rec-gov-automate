@@ -208,56 +208,63 @@ def get_4rivers_permit_availability_by_month(
         # '&is_lottery=false'
     )
 
-    # make the call to get the data
-    res = requests.get(url_api, headers=_headers_dict)
+    # make a few tries...accounts for dropped requests at go time
+    for attempt_cnt in range(25):
 
-    # handle problems when they arise
-    if res.status_code != 200:
-        logging.error(
-            f"Encountered an error retrieving {url_api}\n{res.json().get('error')}"
-        )
-        avail_df = pd.DataFrame(
-            columns=["total", "remaining", "show_walkup", "is_secret_quota"]
-        )
+        # make the call to get the data
+        res = requests.get(url_api, headers=_headers_dict)
 
-    else:
-
-        # unpack the data to a dictionary
-        res_dict = res.json()
-
-        # pull out the availability from the response
-        avail_dict = res_dict.get("payload").get("availability")
-
-        # unpack the date availability
-        dates_dict = avail_dict.get(next(iter(avail_dict))).get("date_availability")
-
-        # create a data frame from the availability
-        avail_df = pd.DataFrame(dates_dict).transpose()
-
-        # if nothing is available create empty dataframe for returning
-        if len(avail_df.index) == 0:
+        # handle problems when they arise
+        if res.status_code != 200:
+            logging.error(
+                f"Encountered an error retrieving {url_api}: {res.json().get('error')}"
+            )
             avail_df = pd.DataFrame(
-                columns=[
-                    "launch_date",
-                    "total",
-                    "remaining",
-                    "show_walkup",
-                    "is_secret_quota",
-                ]
+                columns=["total", "remaining", "show_walkup", "is_secret_quota"]
             )
 
         else:
-            # pull the dates out of the index so easier to work with later
-            avail_df.reset_index(names=["launch_date"], inplace=True)
 
-            # cast the date to datetime in mountain time since this is where the USFS offices are
-            avail_df["launch_date"] = pd.to_datetime(avail_df["launch_date"])
+            # unpack the data to a dictionary
+            res_dict = res.json()
 
-            # use only useful columns
-            avail_df = avail_df.loc[:, ["launch_date", "total", "remaining"]]
+            # pull out the availability from the response
+            avail_dict = res_dict.get("payload").get("availability")
 
-            # filter to just available dates if desired
-            if only_available:
-                avail_df = avail_df.loc[avail_df["remaining"] > 0]
+            # unpack the date availability
+            dates_dict = avail_dict.get(next(iter(avail_dict))).get("date_availability")
+
+            # create a data frame from the availability
+            avail_df = pd.DataFrame(dates_dict).transpose()
+
+            # if nothing is available create empty dataframe for returning
+            if len(avail_df.index) == 0:
+                avail_df = pd.DataFrame(
+                    columns=[
+                        "launch_date",
+                        "total",
+                        "remaining",
+                        "show_walkup",
+                        "is_secret_quota",
+                    ]
+                )
+
+            # if we do have data to work with, whip into a dataframe
+            else:
+                # pull the dates out of the index so easier to work with later
+                avail_df.reset_index(names=["launch_date"], inplace=True)
+
+                # cast the date to datetime in mountain time since this is where the USFS offices are
+                avail_df["launch_date"] = pd.to_datetime(avail_df["launch_date"])
+
+                # use only useful columns
+                avail_df = avail_df.loc[:, ["launch_date", "total", "remaining"]]
+
+                # filter to just available dates if desired
+                if only_available:
+                    avail_df = avail_df.loc[avail_df["remaining"] > 0]
+
+            # break out of the loop (only if successful)
+            break
 
     return avail_df

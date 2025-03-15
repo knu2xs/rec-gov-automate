@@ -1,3 +1,5 @@
+import logging
+import math
 import os
 from datetime import datetime, timedelta
 import re
@@ -16,6 +18,15 @@ def _get_recgov_credentials(
     recgov_password: Optional[str],
 ) -> tuple[str, str]:
     """Helper to get recgov credentials from environment variables or allow user to specify them."""
+    # cast inputs to None if NaN
+    if isinstance(recgov_username, float):
+        if math.isnan(recgov_username):
+            recgov_username = None
+
+    if isinstance(recgov_password, float):
+        if math.isnan(recgov_password):
+            recgov_password = None
+
     # try to retrieve credentials for recreation.gov if not provided
     if (recgov_password is None and recgov_username is not None) or (
         recgov_password is not None and recgov_username is None
@@ -140,100 +151,110 @@ def reserve_4rivers_permit_date(
                 page.get_by_role("button", name="Log In", exact=True).click()
 
                 # permit will be put in cart, and form page will be loaded to input details for permit
+                status = True
 
-                # set launch location
-                if not headless:
-                    page.get_by_label(
-                        "Launch Location* (Required)"
-                    ).scroll_into_view_if_needed()
+                # try to autofill permit information
+                try:
 
-                page.get_by_label("Launch Location* (Required)").select_option(
-                    str(launch_location_code)
-                )
+                    # set launch location
+                    if not headless:
+                        page.get_by_label(
+                            "Launch Location* (Required)"
+                        ).scroll_into_view_if_needed()
 
-                # set take-out
-                if not headless:
-                    page.get_by_label(
-                        "Take-out Location* (Required)"
-                    ).scroll_into_view_if_needed()
+                    page.get_by_label("Launch Location* (Required)").select_option(
+                        str(launch_location_code)
+                    )
 
-                page.get_by_label("Take-out Location* (Required)").select_option(
-                    str(takeout_location_code)
-                )
+                    # set take-out
+                    if not headless:
+                        page.get_by_label(
+                            "Take-out Location* (Required)"
+                        ).scroll_into_view_if_needed()
 
-                # open calendar selector
-                if not headless:
-                    page.get_by_role(
-                        "button", name="Exit Date (Required)"
-                    ).scroll_into_view_if_needed()
-                else:
-                    page.get_by_role("button", name="Exit Date (Required)").hover()
+                    page.get_by_label("Take-out Location* (Required)").select_option(
+                        str(takeout_location_code)
+                    )
 
-                page.get_by_role("button", name="Exit Date (Required)").click()
+                    # open calendar selector
+                    if not headless:
+                        page.get_by_role(
+                            "button", name="Exit Date (Required)"
+                        ).scroll_into_view_if_needed()
+                    else:
+                        page.get_by_role("button", name="Exit Date (Required)").hover()
 
-                # create string to select date by the div label
-                dt_exit = dt + timedelta(days=trip_days - 1)
-                dt_exit_re = rf"""((\b{dt_exit.strftime("%B")}\b)|(\b{dt_exit.strftime("%b")}\b))\s{dt_exit.day:02d},\s{dt_exit.year:04d}\s-\sAvailable"""
+                    page.get_by_role("button", name="Exit Date (Required)").click()
 
-                # select and click the exit date, which closes the calendar selector
-                if not headless:
-                    page.get_by_label(
-                        re.compile(dt_exit_re)
-                    ).scroll_into_view_if_needed()
-                else:
-                    page.get_by_label(re.compile(dt_exit_re)).hover()
+                    # create string to select date by the div label
+                    dt_exit = dt + timedelta(days=trip_days - 1)
+                    dt_exit_re = rf"""((\b{dt_exit.strftime("%B")}\b)|(\b{dt_exit.strftime("%b")}\b))\s{dt_exit.day:02d},\s{dt_exit.year:04d}\s-\sAvailable"""
 
-                page.get_by_label(re.compile(dt_exit_re)).click()
+                    # select and click the exit date, which closes the calendar selector
+                    if not headless:
+                        page.get_by_label(
+                            re.compile(dt_exit_re)
+                        ).scroll_into_view_if_needed()
+                    else:
+                        page.get_by_label(re.compile(dt_exit_re)).hover()
 
-                # select one craft, a single raft
-                if not headless:
-                    page.get_by_label("Type* (Required)").scroll_into_view_if_needed()
+                    page.get_by_label(re.compile(dt_exit_re)).click()
 
-                page.get_by_label("Type* (Required)").select_option("10")
+                    # select one craft, a single raft
+                    if not headless:
+                        page.get_by_label("Type* (Required)").scroll_into_view_if_needed()
 
-                # click to add single watercraft
-                if not headless:
-                    page.get_by_label("Type* (Required)").scroll_into_view_if_needed()
+                    page.get_by_label("Type* (Required)").select_option("10")
 
-                page.get_by_label("Add watercraft").click()
+                    # click to add single watercraft
+                    if not headless:
+                        page.get_by_label("Type* (Required)").scroll_into_view_if_needed()
 
-                # pick up permit at issuing station
-                if not headless:
-                    page.get_by_label(
-                        "Station Location* (Required)"
-                    ).scroll_into_view_if_needed()
+                    page.get_by_label("Add watercraft").click()
 
-                page.get_by_label("Station Location* (Required)").select_option(
-                    str(pickup_permit_location_code)
-                )
+                    # try to find element to select issuing station - may not be present if only one issuing station
+                    sel_station = page.get_by_label("Station Location* (Required)")
 
-                # click terms block
-                if not headless:
-                    page.get_by_label(
-                        "Need to Know", exact=True
-                    ).scroll_into_view_if_needed()
+                    # if possible to select issuing station
+                    if sel_station.count() > 0:
 
-                page.get_by_label("Need to Know", exact=True).click()
+                        # select issuing station if possible
+                        if not headless:
+                            page.get_by_label(
+                                "Station Location* (Required)"
+                            ).scroll_into_view_if_needed()
 
-                # scroll all terms
-                page.mouse.wheel(delta_x=0, delta_y=700)
+                        page.get_by_label("Station Location* (Required)").select_option(
+                            str(pickup_permit_location_code)
+                        )
 
-                # click scroll the terms
-                if not headless:
+                    # click terms block
+                    if not headless:
+                        page.get_by_label(
+                            "Need to Know", exact=True
+                        ).scroll_into_view_if_needed()
+
+                    page.get_by_label("Need to Know", exact=True).click()
+
+                    # scroll all terms
+                    page.mouse.wheel(delta_x=0, delta_y=700)
+
+                    # click scroll the terms
+                    if not headless:
+                        page.locator("label").filter(
+                            has_text="Yes, I have read and agree to"
+                        ).locator("span").first.scroll_into_view_if_needed()
+
+                    # click acceptance of terms
                     page.locator("label").filter(
                         has_text="Yes, I have read and agree to"
-                    ).locator("span").first.scroll_into_view_if_needed()
+                    ).locator("span").first.check()
 
-                # click acceptance of terms
-                page.locator("label").filter(
-                    has_text="Yes, I have read and agree to"
-                ).locator("span").first.check()
+                    # click view cart to commit trip properties (speeds up checkout later)
+                    page.get_by_test_id("OrderDetailsSummary-cart-btn").click()
 
-                # click view cart to commit trip properties (speeds up checkout later)
-                page.get_by_test_id("OrderDetailsSummary-cart-btn").click()
-
-                # set status to return
-                status = True
+                except Exception as e:
+                    logging.warning('Could not autofill trip properties, but was able to reserve permit.')
 
         # close the browser
         browser.close()
