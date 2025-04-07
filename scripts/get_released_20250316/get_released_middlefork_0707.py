@@ -12,17 +12,11 @@ from rec_gov_automate.utils.notification import send_sms
 # variables for running - set these
 river_slug = 'middle_fork'
 launch_month = 7
-launch_day = 10
+launch_day = 7
 recgov_user = None
 recgov_pass = None
 sms_number = None
 headless = True
-
-# testing overrides
-river_slug = 'main_salmon'
-launch_month = 12
-launch_day = 25
-headless = False
 
 
 def login(page: Page):
@@ -70,7 +64,7 @@ rvr = FourRivers._get_river(river_slug)
 river_name = rvr.permit_key.replace("_", " ").title()
 
 # regex status patterns
-date_re = rf"""((\b{dt.strftime("%B")}\b)|(\b{dt.strftime("%b")}\b))\s{dt.day:02d},\s{dt.year:04d}"""
+date_re = rf"""((\b{dt.strftime("%B")}\b)|(\b{dt.strftime("%b")}\b))\s(({dt.day})|({dt.day:02d})),\s{dt.year:04d}"""
 lottery_re = rf"""{date_re}\s-\sLottery"""
 avail_re = rf"""{date_re}\s-\sAvailable"""
 unaval_re = rf"""{date_re}\s-\sUnavailable"""
