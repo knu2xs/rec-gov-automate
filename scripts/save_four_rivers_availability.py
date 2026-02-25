@@ -23,7 +23,7 @@ if not importlib.util.find_spec(pkg_name):
     )
 
 # import needed resources
-from rec_gov_automate.main import get_fourrivers_availability
+from rec_gov_automate._main import get_fourrivers_availability
 from rec_gov_automate.utils import format_pandas_for_logging
 
 if __name__ == "__main__":
