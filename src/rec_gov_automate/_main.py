@@ -2,6 +2,8 @@ import logging
 from datetime import date, datetime, timezone
 from functools import cache, cached_property
 import  math
+from multiprocessing import Pool, Manager
+import time
 from typing import Optional, Union
 
 import pandas as pd
@@ -474,6 +476,178 @@ class FourRivers:
                     attempt_cnt += 1
 
         return success_flag
+
+    def reserve_date_parallel(
+        self,
+        day: int,
+        month: int,
+        year: Optional[int] = None,
+        recgov_username: Optional[str] = None,
+        recgov_password: Optional[str] = None,
+        headless: Optional[bool] = True,
+        max_duration: float = 300.0,
+        num_workers: int = 20,
+        stagger_delay: float = 0.1,
+    ) -> bool:
+        """
+        Reserve date for the river using parallel processes.
+
+        This function spawns multiple concurrent processes attempting to reserve a permit.
+        Processes start with a staggered delay and continue recycling until one succeeds
+        or the maximum duration is reached.
+
+        Args:
+            day: Day of the month for launch date.
+            month: Month for launch date.
+            year: Year for launch date. Defaults to current year.
+            recgov_username: Recreation.gov username for authentication.
+            recgov_password: Recreation.gov password for authentication.
+            headless: Run browser in headless mode. Defaults to True.
+            max_duration: Maximum time in seconds to continue attempting. Defaults to 300.0 (5 minutes).
+            num_workers: Number of concurrent worker processes. Defaults to 20.
+            stagger_delay: Delay in seconds between starting each worker. Defaults to 0.1.
+
+        Returns:
+            bool: True if a permit was successfully reserved, False otherwise.
+
+        !!! warning
+            This function spawns multiple browser instances concurrently which may consume
+            significant system resources. Adjust `num_workers` based on your system capabilities.
+
+        ```python
+        # Example usage
+        rvr = FourRivers._get_river('middle_fork')
+        success = rvr.reserve_date_parallel(
+            day=15,
+            month=7,
+            year=2026,
+            recgov_username='user@example.com',
+            recgov_password='password123',
+            max_duration=600.0  # 10 minutes
+        )
+        ```
+        """
+        # Default to this year if not provided
+        if year is None:
+            year = datetime.now().year
+
+        # Check if the date is available first
+        avail = self.check_availability(day, month)
+        if not avail:
+            logging.debug(
+                datetime(year, month, day).strftime("%B %d, %Y")
+                + " not available for "
+                + self.permit_key
+            )
+            return False
+
+        logging.info(
+            f"Starting parallel reservation attempts for {datetime(year, month, day).strftime('%B %d, %Y')} "
+            f"on {self.permit_key} with {num_workers} workers for up to {max_duration} seconds"
+        )
+
+        # Create a manager for shared state
+        manager = Manager()
+        success_flag = manager.Value('b', False)
+        
+        # Create a wrapper function for multiprocessing
+        def _reserve_wrapper(args):
+            """Wrapper function that can be pickled for multiprocessing."""
+            worker_id, shared_success = args
+            
+            # Check if another process already succeeded
+            if shared_success.value:
+                return False
+            
+            try:
+                result = reserve.reserve_4rivers_permit_date(
+                    permit_id=self.permit_id,
+                    day=day,
+                    month=month,
+                    launch_location_code=self.putin_code,
+                    takeout_location_code=self.takeout_code,
+                    pickup_permit_location_code=self.permit_pickup_location_code,
+                    trip_days=self.trip_days,
+                    year=year,
+                    recgov_username=recgov_username,
+                    recgov_password=recgov_password,
+                    headless=headless,
+                )
+                
+                # If successful, update shared flag
+                if result and not shared_success.value:
+                    shared_success.value = True
+                    logging.info(
+                        f"Worker {worker_id}: Successfully reserved "
+                        f"{datetime(year, month, day).strftime('%B %d, %Y')} for {self.permit_key}"
+                    )
+                
+                return result
+                
+            except Exception as e:
+                logging.debug(f"Worker {worker_id}: Exception occurred - {str(e)}")
+                return False
+
+        start_time = time.time()
+        worker_count = 0
+        active_jobs = []
+        
+        # Create process pool
+        with Pool(processes=num_workers) as pool:
+            try:
+                # Main loop: keep spawning workers until success or timeout
+                while not success_flag.value and (time.time() - start_time) < max_duration:
+                    
+                    # Clean up completed jobs
+                    active_jobs = [job for job in active_jobs if not job.ready()]
+                    
+                    # Spawn new workers to maintain pool size
+                    while len(active_jobs) < num_workers and not success_flag.value:
+                        worker_count += 1
+                        job = pool.apply_async(_reserve_wrapper, ((worker_count, success_flag),))
+                        active_jobs.append(job)
+                        logging.debug(f"Spawned worker {worker_count}")
+                        
+                        # Stagger the starts
+                        time.sleep(stagger_delay)
+                    
+                    # Brief sleep to avoid busy waiting
+                    time.sleep(0.05)
+                    
+                    # Check if any job succeeded
+                    for job in active_jobs:
+                        if job.ready():
+                            try:
+                                if job.get(timeout=0):
+                                    success_flag.value = True
+                                    break
+                            except Exception:
+                                pass
+                
+                # Terminate all remaining jobs
+                pool.terminate()
+                pool.join()
+                
+            except KeyboardInterrupt:
+                logging.info("Parallel reservation interrupted by user")
+                pool.terminate()
+                pool.join()
+                return False
+
+        elapsed_time = time.time() - start_time
+        
+        if success_flag.value:
+            logging.info(
+                f"Successfully reserved {datetime(year, month, day).strftime('%B %d, %Y')} "
+                f"for {self.permit_key} after {elapsed_time:.2f} seconds with {worker_count} total attempts"
+            )
+        else:
+            logging.info(
+                f"Failed to reserve {datetime(year, month, day).strftime('%B %d, %Y')} "
+                f"for {self.permit_key} after {elapsed_time:.2f} seconds with {worker_count} total attempts"
+            )
+        
+        return success_flag.value
 
 
 def get_fourrivers_availability(
